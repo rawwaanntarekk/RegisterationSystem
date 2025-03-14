@@ -1,8 +1,14 @@
-
+﻿
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using RegisterationSystem.Models;
+using RegisterationSystem.Models.View_Models;
+using RegisterationSystem.View_Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net.WebSockets;
+using System.Security.Claims;
 using System.Text;
 
 namespace RegisterationSystem
@@ -33,6 +39,8 @@ namespace RegisterationSystem
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
             });
 
+            builder.Services.AddAuthorization();
+
             builder.Services.AddAuthentication();
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -51,8 +59,9 @@ namespace RegisterationSystem
             app.UseHttpsRedirection();
 
             app.UseAuthentication();
+            app.UseAuthorization();
 
-            app.MapPost("/api/signup", async ( DataAccess dataAccess, [FromBody] StudentFormViewModel model) =>
+            app.MapPost("/api/signup", async (DataAccess dataAccess, [FromBody] SignUpViewModel model) =>
             {
                 if (string.IsNullOrEmpty(model.Name))
                     return Results.BadRequest("Name is required.");
@@ -72,11 +81,11 @@ namespace RegisterationSystem
                 var studentExists = dataAccess.GetStudentById(model.Id);
                 if (studentExists != null)
                     return Results.BadRequest("Student already exists.");
-                
-                if (model.Level < 0 || (int) model.Level! > 4)
+
+                if (model.Level < 0 || (int)model.Level! > 4)
                     return Results.BadRequest("Invalid Level.");
 
-                if ((int) model.Gender! > 2)
+                if ((int)model.Gender! > 2)
                     return Results.BadRequest("Invalid Gender.");
 
                 var passwordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
@@ -100,6 +109,59 @@ namespace RegisterationSystem
                     return Results.BadRequest("Failed to add student.");
             })
             .WithName("SignUp")
+            .WithOpenApi();
+
+
+
+            app.MapPost("/api/signin", async (DataAccess dataAccess, IConfiguration config, [FromBody] SignInViewModel model) =>
+            {
+                if (string.IsNullOrEmpty(model.Email) || !model.Email.EndsWith("@stud.fci-cu.edu.eg"))
+                    return Results.BadRequest("Email must be like StudentId@stud.fci-cu.edu.eg");
+
+                var student = dataAccess.GetStudentByEmail(model.Email);
+                if (student == null || !BCrypt.Net.BCrypt.Verify(model.Password, student.PasswordHash))
+                    return Results.BadRequest("Invalid email or password.");
+
+                // Generate JWT token
+                var jwtSettings = config.GetSection("Jwt");
+                var token = new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
+                    issuer: jwtSettings["Issuer"],
+                    audience: jwtSettings["Audience"],
+                    claims:
+                    [
+                        new Claim(ClaimTypes.NameIdentifier, student.Id.ToString()),
+                        new Claim(ClaimTypes.Email, student.Email)
+                    ],
+                    expires: DateTime.UtcNow.AddHours(1),
+                    signingCredentials: new SigningCredentials(
+                        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"])),
+                        SecurityAlgorithms.HmacSha256Signature)
+                ));
+
+                return Results.Ok(new { Message = "Login successful!", Token = token });
+            })
+            .WithName("SignIn")
+            .WithOpenApi();
+
+
+            app.MapGet("/api/student/{id}", async (DataAccess dataAccess, string id) =>
+            {
+            var student = dataAccess.GetStudentById(id);
+            if (student == null)
+                return Results.NotFound("Student not found.");
+
+            var ProfileStudent = new ProfileStudentViewModel
+            {
+                Id = student.Id,
+                Name = student.Name,
+                Email = student.Email,
+                Level = student.Level,
+                Gender = student.Gender
+            };
+
+                return Results.Ok(ProfileStudent);
+            })
+            .WithName("GetStudentById")
             .WithOpenApi();
 
             app.Run();

@@ -1,6 +1,6 @@
 ﻿namespace RegisterationSystem.Models
 {
-    public class StudentFormViewModel
+    public class SignUpViewModel
     {
         public string Id { get; set; }
         public string Name { get; set; }
