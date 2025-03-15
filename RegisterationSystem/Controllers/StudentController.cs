@@ -1,0 +1,127 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using RegisterationSystem.Models;
+using RegisterationSystem.Models.View_Models;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Security.Claims;
+using RegisterationSystem.View_Models;
+
+namespace RegisterationSystem.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class StudentController : ControllerBase
+    {
+        private readonly DataAccess _dataAccess;
+        private readonly IConfiguration _config;
+
+        public StudentController(DataAccess dataAccess, IConfiguration config)
+        {
+            _dataAccess = dataAccess;
+            _config = config;
+        }
+
+        [HttpPost("signup")]
+        [IgnoreAntiforgeryToken] 
+        public async Task<IActionResult> SignUp([FromForm] SignUpViewModel model)
+        {
+            if (string.IsNullOrEmpty(model.Name))
+                return BadRequest("Name is required.");
+
+            if (string.IsNullOrEmpty(model.Email) || !model.Email.EndsWith("@stud.fci-cu.edu.eg"))
+                return BadRequest("Email must be like studentID@stud.fci-cu.edu.eg");
+
+            if (string.IsNullOrEmpty(model.Id) || !model.Email.StartsWith(model.Id + "@"))
+                return BadRequest("Student ID must match the email prefix.");
+
+            if (string.IsNullOrEmpty(model.Password) || model.Password.Length < 8 || !model.Password.Any(char.IsDigit))
+                return BadRequest("Password must be at least 8 characters and contain at least one number.");
+
+            if (model.Password != model.ConfirmPassword)
+                return BadRequest("Passwords do not match.");
+
+            var studentExists = _dataAccess.GetStudentById(model.Id);
+            if (studentExists != null)
+                return BadRequest("Student already exists.");
+
+            if (model.Level < 0 || (int)model.Level! > 4)
+                return BadRequest("Invalid Level.");
+
+            if ((int)model.Gender! > 2)
+                return BadRequest("Invalid Gender.");
+
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
+
+            using var stream = new MemoryStream();
+            if (model.Photo != null)
+                await model.Photo.CopyToAsync(stream);
+
+            var student = new Student
+            {
+                Id = model.Id,
+                Name = model.Name,
+                Gender = model.Gender,
+                Email = model.Email,
+                Level = model.Level,
+                PasswordHash = passwordHash,
+                Photo = stream.ToArray()
+            };
+
+            var success = _dataAccess.AddStudent(student);
+            if (success)
+                return Ok("Signup successful!");
+            else
+                return BadRequest("Failed to add student.");
+        }
+
+        [HttpPost("signin")]
+        public async Task<IActionResult> SignIn([FromBody] SignInViewModel model)
+        {
+            if (string.IsNullOrEmpty(model.Email) || !model.Email.EndsWith("@stud.fci-cu.edu.eg"))
+                return BadRequest("Email must be like StudentId@stud.fci-cu.edu.eg");
+
+            var student = _dataAccess.GetStudentByEmail(model.Email);
+            if (student == null || !BCrypt.Net.BCrypt.Verify(model.Password, student.PasswordHash))
+                return BadRequest("Invalid email or password.");
+
+            // Generate JWT token
+            var jwtSettings = _config.GetSection("Jwt");
+            var token = new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
+                issuer: jwtSettings["Issuer"],
+                audience: jwtSettings["Audience"],
+                claims:
+                [
+                    new Claim(ClaimTypes.NameIdentifier, student.Id.ToString()),
+                    new Claim(ClaimTypes.Email, student.Email)
+                ],
+                expires: DateTime.UtcNow.AddHours(1),
+                signingCredentials: new SigningCredentials(
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"])),
+                    SecurityAlgorithms.HmacSha256Signature)
+            ));
+
+            return Ok(new { Message = "Login successful!", Token = token });
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetStudentById(string id)
+        {
+            var student = _dataAccess.GetStudentById(id);
+            if (student == null)
+                return NotFound("Student not found.");
+
+            var ProfileStudent = new ProfileStudentViewModel
+            {
+                Id = student.Id,
+                Name = student.Name,
+                Email = student.Email,
+                Level = student.Level,
+                Gender = student.Gender,
+                Photo = student.Photo
+            };
+
+            return Ok(ProfileStudent);
+        }
+    }
+}
