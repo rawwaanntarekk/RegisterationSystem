@@ -23,7 +23,7 @@ namespace RegisterationSystem.Controllers
         }
 
         [HttpPost("signup")]
-        [IgnoreAntiforgeryToken] 
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> SignUp([FromForm] SignUpViewModel model)
         {
             if (string.IsNullOrEmpty(model.Name))
@@ -53,9 +53,18 @@ namespace RegisterationSystem.Controllers
 
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
 
-            using var stream = new MemoryStream();
-            if (model.Photo != null)
-                await model.Photo.CopyToAsync(stream);
+            string photoPath = null;
+            if (model.Photo != null && model.Photo.Length > 0)
+            {
+                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(model.Photo.FileName);
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads", fileName);
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? "wwwroot/uploads");
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await model.Photo.CopyToAsync(stream);
+                }
+                photoPath = $"/uploads/{fileName}";
+            }
 
             var student = new Student
             {
@@ -65,14 +74,27 @@ namespace RegisterationSystem.Controllers
                 Email = model.Email,
                 Level = model.Level,
                 PasswordHash = passwordHash,
-                Photo = stream.ToArray()
+                PhotoPath = photoPath
+
             };
 
             var success = _dataAccess.AddStudent(student);
             if (success)
-                return Ok("Signup successful!");
+                return Ok(new
+                {
+                    success = true,
+                    message = "Signup successful!",
+                    data = new
+                    {
+                        id = student.Id,
+                        name = student.Name,
+                        email = student.Email,
+                        photoPath = student.PhotoPath
+                    }
+                });
             else
-                return BadRequest("Failed to add student.");
+                return Ok(new { success = false, message = "Failed to add student.", data = (object)null! });
+
         }
 
         [HttpPost("signin")]
@@ -101,11 +123,16 @@ namespace RegisterationSystem.Controllers
                     SecurityAlgorithms.HmacSha256Signature)
             ));
 
-            return Ok(new { Message = "Login successful!", Token = token });
+            return Ok(new
+            {
+                Success = true,
+                message = "Signin successful!",
+                data = new { token, id = student.Id, email = student.Email }
+            });
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetStudentById(string id)
+        public IActionResult GetStudentById(string id)
         {
             var student = _dataAccess.GetStudentById(id);
             if (student == null)
@@ -118,10 +145,16 @@ namespace RegisterationSystem.Controllers
                 Email = student.Email,
                 Level = student.Level,
                 Gender = student.Gender,
-                Photo = student.Photo
+                PhotoPath = student.PhotoPath
+
             };
 
-            return Ok(ProfileStudent);
+            return Ok(new
+            {
+                success = true,
+                message = "Student data retrieved successfully!",
+                data = ProfileStudent
+            });
         }
     }
 }

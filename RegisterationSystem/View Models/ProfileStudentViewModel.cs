@@ -9,7 +9,7 @@ namespace RegisterationSystem.View_Models
         public string Email { get; set; }
         public Gender? Gender { get; set; }
         public Level? Level { get; set; }
-        public byte[] Photo { get; set; }
+        public string PhotoPath { get; set; }
     }
 
 }

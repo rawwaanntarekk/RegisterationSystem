@@ -10,7 +10,7 @@
         public Level? Level { get; set; }
         public string PasswordHash { get; set; }
         public string ConfirmPassword { get; set; }
-        public byte[] Photo { get; set; }
+        public string PhotoPath { get; set; }
 
 
     }

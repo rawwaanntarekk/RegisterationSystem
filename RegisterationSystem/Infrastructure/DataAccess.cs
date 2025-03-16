@@ -19,8 +19,8 @@ namespace RegisterationSystem
         {
             using var connection = CreateConnection();
 
-            return connection.Execute("INSERT INTO Students (Id, Name, Email, NormalizedEmail, Gender, Level, PasswordHash, Photo) " +
-                                           "Values(@Id, @Name, @Email, @NormalizedEmail, @Gender, @Level, @PasswordHash, @Photo);" , model) > 0;
+            return connection.Execute("INSERT INTO Students (Id, Name, Email, NormalizedEmail, Gender, Level, PasswordHash, PhotoPath) " +
+                                           "Values(@Id, @Name, @Email, @NormalizedEmail, @Gender, @Level, @PasswordHash, @PhotoPath);", model) > 0;
 
         }
 
