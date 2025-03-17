@@ -19,7 +19,7 @@ namespace RegisterationSystem.Controllers
 
         [HttpPost("signup")]
         [IgnoreAntiforgeryToken]
-        public async Task<IActionResult> SignUp([FromForm] SignUpViewModel model)
+        public IActionResult SignUp([FromForm] SignUpViewModel model)
         {
             if (string.IsNullOrEmpty(model.Name))
                 return BadRequest("Name is required.");
@@ -81,7 +81,7 @@ namespace RegisterationSystem.Controllers
         }
 
         [HttpPost("signin")]
-        public async Task<IActionResult> SignIn([FromForm] SignInViewModel model)
+        public IActionResult SignIn([FromForm] SignInViewModel model)
         {
             if (string.IsNullOrEmpty(model.Email) || !model.Email.EndsWith("@stud.fci-cu.edu.eg"))
                 return BadRequest("Email must be like StudentId@stud.fci-cu.edu.eg");
@@ -116,7 +116,7 @@ namespace RegisterationSystem.Controllers
 
         [HttpPost("update")]
         [Authorize]
-        public async Task<IActionResult> UpdateStudent([FromForm] UpdateViewModel model)
+        public async  Task<IActionResult> UpdateStudent([FromForm] UpdateViewModel model)
         {
             var student = _dataAccess.GetStudentById(model.Id);
 
@@ -168,7 +168,7 @@ namespace RegisterationSystem.Controllers
                     }
                     );
             else
-                return Ok(new { success = false, message = "Failed to update student.", data = (object) null! });
+                return Ok(new { success = false, message = "Failed to update student.", data = (object)null! });
         }
 
 
@@ -196,6 +196,30 @@ namespace RegisterationSystem.Controllers
                 message = "Student data retrieved successfully!",
                 data = ProfileStudent
             });
+        }
+
+        [HttpGet("/")]
+        public IActionResult GetAllStudents()
+        {
+            var students = _dataAccess.GetStudents();
+            var ProfileStudents = students.Select(student => new ProfileStudentViewModel
+            {
+                Id = student.Id,
+                Name = student.Name,
+                Email = student.Email,
+                Level = student.Level,
+                Gender = student.Gender,
+                PhotoPath = student.PhotoPath,
+
+            }).ToList();
+
+            return Ok(new
+            {
+                success = true,
+                message = "Students data retrieved successfully!",
+                data = ProfileStudents
+            });
+
         }
     }
 }

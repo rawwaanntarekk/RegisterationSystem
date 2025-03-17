@@ -15,6 +15,12 @@ namespace RegisterationSystem
 
         public IDbConnection CreateConnection() => new SqlConnection(_connectionString);
 
+        public IQueryable<Student> GetStudents()
+        {
+            using var connection = CreateConnection();
+            return connection.Query<Student>("SELECT * FROM Students").AsQueryable();
+        }
+
         public bool AddStudent(Student model)
         {
             using var connection = CreateConnection();
