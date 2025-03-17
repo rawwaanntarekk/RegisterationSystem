@@ -36,10 +36,15 @@ namespace RegisterationSystem
             return connection.QueryFirstOrDefault<Student>("SELECT * FROM Students WHERE Id = @Id", new { Id = id })!;
         }
 
+        public bool UpdateStudent(Student model)
+        {
+            using var connection = CreateConnection();
+            return connection.Execute("UPDATE Students SET Name = @Name, Gender = @Gender, Level = @Level, PhotoPath = @PhotoPath WHERE Id = @Id", model) > 0;
+        }
 
 
 
 
 
-    }
+        }
 }

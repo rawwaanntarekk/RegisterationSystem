@@ -6,21 +6,16 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Security.Claims;
 using RegisterationSystem.View_Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace RegisterationSystem.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class StudentController : ControllerBase
+    public class StudentController(DataAccess dataAccess, IConfiguration config) : ControllerBase
     {
-        private readonly DataAccess _dataAccess;
-        private readonly IConfiguration _config;
-
-        public StudentController(DataAccess dataAccess, IConfiguration config)
-        {
-            _dataAccess = dataAccess;
-            _config = config;
-        }
+        private readonly DataAccess _dataAccess = dataAccess;
+        private readonly IConfiguration _config = config;
 
         [HttpPost("signup")]
         [IgnoreAntiforgeryToken]
@@ -53,18 +48,7 @@ namespace RegisterationSystem.Controllers
 
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
 
-            string photoPath = null;
-            if (model.Photo != null && model.Photo.Length > 0)
-            {
-                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(model.Photo.FileName);
-                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads", fileName);
-                Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? "wwwroot/uploads");
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await model.Photo.CopyToAsync(stream);
-                }
-                photoPath = $"/uploads/{fileName}";
-            }
+
 
             var student = new Student
             {
@@ -74,7 +58,6 @@ namespace RegisterationSystem.Controllers
                 Email = model.Email,
                 Level = model.Level,
                 PasswordHash = passwordHash,
-                PhotoPath = photoPath
 
             };
 
@@ -130,6 +113,64 @@ namespace RegisterationSystem.Controllers
                 data = new { token, id = student.Id, email = student.Email }
             });
         }
+
+        [HttpPost("update")]
+        [Authorize]
+        public async Task<IActionResult> UpdateStudent(UpdateViewModel model)
+        {
+            var student = _dataAccess.GetStudentById(model.Id);
+
+            if (student == null)
+                return NotFound("Student not found.");
+
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (userId != student.Id)
+                return Unauthorized("You are not authorized to update this student.");
+
+            string photoPath = null;
+            if (model.Photo != null && model.Photo.Length > 0)
+            {
+                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(model.Photo.FileName);
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads", fileName);
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? "wwwroot/uploads");
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await model.Photo.CopyToAsync(stream);
+                }
+                photoPath = $"/uploads/{fileName}";
+            }
+
+
+            student.Name = model.Name;
+            student.Level = model.Level;
+            student.Gender = model.Gender;
+            student.PhotoPath = photoPath!;
+
+            var success = _dataAccess.UpdateStudent(student);
+
+
+            if (success)
+                return Ok(
+                    new
+                    {
+                        success = true,
+                        message = "Student updated successfully!",
+                        data = new
+                        {
+                            id = student.Id,
+                            name = student.Name,
+                            email = student.Email,
+                            photoPath = student.PhotoPath,
+                            level = student.Level,
+                            gender = student.Gender
+                        }
+                    }
+                    );
+            else
+                return Ok(new { success = false, message = "Failed to update student.", data = (object) null! });
+        }
+
 
         [HttpGet("{id}")]
         public IActionResult GetStudentById(string id)
