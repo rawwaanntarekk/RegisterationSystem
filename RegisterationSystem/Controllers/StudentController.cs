@@ -81,7 +81,7 @@ namespace RegisterationSystem.Controllers
         }
 
         [HttpPost("signin")]
-        public async Task<IActionResult> SignIn([FromBody] SignInViewModel model)
+        public async Task<IActionResult> SignIn([FromForm] SignInViewModel model)
         {
             if (string.IsNullOrEmpty(model.Email) || !model.Email.EndsWith("@stud.fci-cu.edu.eg"))
                 return BadRequest("Email must be like StudentId@stud.fci-cu.edu.eg");
@@ -116,7 +116,7 @@ namespace RegisterationSystem.Controllers
 
         [HttpPost("update")]
         [Authorize]
-        public async Task<IActionResult> UpdateStudent(UpdateViewModel model)
+        public async Task<IActionResult> UpdateStudent([FromForm] UpdateViewModel model)
         {
             var student = _dataAccess.GetStudentById(model.Id);
 
