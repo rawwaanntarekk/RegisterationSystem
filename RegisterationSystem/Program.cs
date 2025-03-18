@@ -34,6 +34,8 @@ namespace RegisterationSystem
                 };
             });
 
+           
+
             builder.Services.AddAuthorization();
 
             builder.Services.AddAuthentication();
@@ -43,6 +45,8 @@ namespace RegisterationSystem
             builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
+
+            var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
@@ -57,9 +61,9 @@ namespace RegisterationSystem
             app.UseAuthentication();
             app.UseAuthorization();
 
-            app.MapControllers(); 
+            app.MapControllers();
 
-            app.Run();
+            app.Run($"http://0.0.0.0:{port}");
         }
     }
 }
