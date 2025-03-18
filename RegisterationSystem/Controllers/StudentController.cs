@@ -12,10 +12,18 @@ namespace RegisterationSystem.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class StudentController(DataAccess dataAccess, IConfiguration config) : ControllerBase
+    public class StudentController : ControllerBase
     {
-        private readonly DataAccess _dataAccess = dataAccess;
-        private readonly IConfiguration _config = config;
+
+        private readonly DataAccess _dataAccess;
+        private readonly IConfiguration _config;
+
+        public StudentController(DataAccess dataAccess, IConfiguration config)
+        {
+            _dataAccess = dataAccess;
+            _config = config;
+
+        }
 
         [HttpPost("signup")]
         [IgnoreAntiforgeryToken]
@@ -96,10 +104,8 @@ namespace RegisterationSystem.Controllers
                 issuer: jwtSettings["Issuer"],
                 audience: jwtSettings["Audience"],
                 claims:
-                [
-                    new Claim(ClaimTypes.NameIdentifier, student.Id.ToString()),
-                    new Claim(ClaimTypes.Email, student.Email)
-                ],
+                    new[] { new Claim(ClaimTypes.NameIdentifier, student.Id), new Claim(ClaimTypes.Email, student.Email) }
+                ,
                 expires: DateTime.UtcNow.AddHours(1),
                 signingCredentials: new SigningCredentials(
                     new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"])),
